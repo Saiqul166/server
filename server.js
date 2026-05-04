@@ -3,6 +3,11 @@ import { exec } from 'child_process';
 import cors from 'cors';
 import 'dotenv/config';
 import { GoogleGenAI } from '@google/genai';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 // Cloud Run injects PORT automatically. Using 8080 as local fallback for Cloud Shell.
@@ -29,7 +34,7 @@ const authenticate = (req, res, next) => {
 };
 
 // Healthcheck Route
-app.get('/', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.json({ message: 'Server is up and running!', status: 'OK' });
 });
 
@@ -106,6 +111,14 @@ app.post('/run', authenticate, (req, res) => {
     // Command result return করা হচ্ছে
     res.json({ output: stdout, warnings: stderr });
   });
+});
+
+// ==========================================
+// Serve React Frontend (Website UI)
+// ==========================================
+app.use(express.static(path.join(__dirname, 'dist')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // Start Server

@@ -90,7 +90,7 @@ export default function App() {
   }
 
   const codeBlocks = {
-    clone: `git pull origin main\nnpm install\nnpm start`,
+    clone: `killall node 2>/dev/null || true\ngit pull origin main\nnpm install\nnpm run build\nPORT=8080 npm start`,
     deploy: `gcloud services enable run.googleapis.com\ngcloud run deploy node-backend \\\n  --source . \\\n  --port 8080 \\\n  --allow-unauthenticated \\\n  --region us-central1`
   };
 
