@@ -151,9 +151,9 @@ export default function App() {
           </div>
           
           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg shadow-inner">
-            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">AI Power (Hugging Face)</h2>
+            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">AI Power (Google Gemini)</h2>
             <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-               Hugging Face-এর <span className="text-cyan-400">google/gemma-7b-it</span> মডেল ব্যবহার করে শুধু লিখে বললেই টার্মিনাল আপনাকে সার্ভার কন্ট্রোল করতে সাহায্য করবে। 
+               সার্ভারে কোনো বিশাল মডেল ডাউনলোড করার ঝামেলা এড়াতে সরাসরি <strong>Google Gemini API</strong> ব্যবহার করা হয়েছে। শুধু লিখে বললেই টার্মিনাল আপনার জন্য সঠিক লিনাক্স কমান্ড জেনারেট করে রান করতে পারবে। 
             </p>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-slate-800 rounded border border-slate-700 hover:border-cyan-500 transition-colors">
@@ -164,7 +164,7 @@ export default function App() {
                   className="accent-cyan-500"
                 />
                 <Cpu size={16} className={isAiMode ? 'text-cyan-400' : 'text-slate-500'} />
-                <span className={isAiMode ? 'text-white' : 'text-slate-400'}>Enable AI Assistant</span>
+                <span className={isAiMode ? 'text-white' : 'text-slate-400'}>Enable Gemini Assistant</span>
               </label>
             </div>
           </div>
@@ -172,10 +172,10 @@ export default function App() {
           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
              <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Info</h2>
              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-               Cloud Run এ 31B প্যারামিটারের মডেল হোস্ট করা সম্ভব নয় তাই Hugging Face Inference API ব্যবহার করা হয়েছে দ্রুততম রেস্পন্স পাওয়ার জন্য।
+               Cloud Run বা Cloud Shell-এর সীমিত RAM-এ 31B মডেল ডাউনলোড করে লোকালি চালানো অসম্ভব। তাই প্রজেক্টের বিল্ট-ইন Gemini API ব্যবহার করে দ্রুততম AI সাপোর্ট নিশ্চিত করা হয়েছে।
              </p>
              <p className="text-[10px] text-slate-500 pt-2 border-t border-slate-800">
-               Note: Set HF_TOKEN in server .env for AI features.
+               Environment Variable GEMINI_API_KEY is actively used.
              </p>
           </div>
         </section>

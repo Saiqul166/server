@@ -2,8 +2,7 @@ import express from 'express';
 import { exec } from 'child_process';
 import cors from 'cors';
 import 'dotenv/config';
-import localtunnel from 'localtunnel';
-import { HfInference } from '@huggingface/inference';
+import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 // Cloud Run injects PORT automatically. Using 8080 as local fallback for Cloud Shell.
@@ -17,8 +16,9 @@ app.use(express.json());
 // ==========================================
 // শুধুমাত্র যাদের কাছে সঠিক API_KEY আছে, তারাই request করতে পারবে।
 const API_KEY = process.env.API_KEY || 'my-super-secret-key-2024';
-// Hugging Face Token for AI capabilities
-const hf = new HfInference(process.env.HF_TOKEN);
+
+// Initialize Gemini API
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const authenticate = (req, res, next) => {
   const reqApiKey = req.headers['x-api-key'];
@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// AI Command Generation API
+// AI Command Generation API (Powered by Gemini)
 // ==========================================
 app.post('/ai-command', authenticate, async (req, res) => {
   const { prompt } = req.body;
@@ -44,25 +44,23 @@ app.post('/ai-command', authenticate, async (req, res) => {
   }
 
   try {
-    // using a highly capable instruct model from Hugging Face
-    // Model: google/gemma-7b-it (or similar supported via inference API)
-    const result = await hf.textGeneration({
-      model: 'google/gemma-7b-it',
-      inputs: `You are an expert Linux system administrator. Convert the following user request into a single, valid execution-ready Ubuntu Linux bash command. Output ONLY the raw command. No markdown, no explanations.\n\nUser Request: ${prompt}\nCommand:`,
-      parameters: {
-        max_new_tokens: 100,
-        temperature: 0.1,
-      }
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `You are an expert Linux system administrator. Convert the following user request into a single, valid execution-ready Ubuntu Linux bash command. Output ONLY the raw command. No markdown, no explanations, no backticks.
+      
+      User Request: ${prompt}
+      Command:`
     });
 
-    const output = result.generated_text;
-    // Extracting the generated command only
-    const command = output.split('Command:').pop().trim().replace(/\`\`\`/g, '').split('\\n')[0].trim();
+    const output = response.text || '';
+    // Extracting the generated command only (cleaning up possible markdown codeblocks)
+    let command = output.replace(/```bash/gi, '').replace(/```/g, '').trim();
+    command = command.split('\n')[0].trim(); // Take just the first line to be safe
 
     res.json({ command });
   } catch (error) {
     console.error('AI Error:', error.message);
-    res.status(500).json({ error: 'HF Token needed or Model loading: ' + error.message });
+    res.status(500).json({ error: 'Gemini AI Error: ' + error.message });
   }
 });
 
