@@ -116,18 +116,29 @@ app.listen(PORT, '0.0.0.0', async () => {
 
   // Cloud Run sets K_SERVICE. If it's undefined, we are running locally (like Cloud Shell)
   if (!process.env.K_SERVICE) {
-    try {
-      const tunnel = await localtunnel({ port: PORT });
-      console.log(`\n=============================================================`);
-      console.log(`✅ PUBLIC URL (Temporary): ${tunnel.url}`);
-      console.log(`=============================================================\n`);
-      console.log(`আপনি এখন এই লিংকটি কপি করে যেকোনো ব্রাউজারে পেস্ট করে API চেক করতে পারবেন! (e.g. ${tunnel.url}/ )\n`);
+    console.log(`\n=============================================================`);
+    console.log(`⏳ Starting Cloudflare Tunnel... Please wait.`);
+    import('child_process').then(({ spawn }) => {
+      // Using Cloudflare Quick Tunnels instead of localtunnel
+      const cloudflared = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://localhost:${PORT}`]);
       
-      tunnel.on('close', () => {
-        console.log('Public tunnel closed.');
+      let urlFound = false;
+      cloudflared.stderr.on('data', (data) => {
+        const str = data.toString();
+        const match = str.match(/(https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com)/);
+        if(match && !urlFound) {
+          urlFound = true;
+          console.log(`✅ CLOUDFLARE PUBLIC URL: ${match[1]}`);
+          console.log(`=============================================================\n`);
+          console.log(`আপনি এখন এই Cloudflare লিংকটি ব্যবহার করে যেকোনো ব্রাউজার থেকে অথবা ওয়েবসাইট থেকে API কল করতে পারবেন! এটি 100% কাজ করবে।\n`);
+        }
       });
-    } catch (err) {
-      console.error('⚠️ Failed to create public tunnel:', err.message);
-    }
+      
+      cloudflared.on('close', (code) => {
+        console.log(`Cloudflare tunnel closed with code ${code}`);
+      });
+    }).catch(err => {
+      console.error('⚠️ Failed to create Cloudflare tunnel:', err.message);
+    });
   }
 });
