@@ -116,10 +116,33 @@ app.post('/run', authenticate, (req, res) => {
 // ==========================================
 // Serve React Frontend (Website UI)
 // ==========================================
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
+import fs from 'fs';
+
+const distPath = path.join(__dirname, 'dist');
+
+if (fs.existsSync(distPath)) {
+  // If dist exists (production build), serve it directly
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // If dist doesn't exist, use Vite's development middleware
+  console.log('⚡ Loading Vite Development Middleware...');
+  try {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } catch (err) {
+    console.error('Failed to start Vite middleware:', err);
+    app.get('*', (req, res) => {
+      res.status(404).send('<h2>Frontend build not found and Vite failed to load. Please run <code>npm run build</code> first.</h2>');
+    });
+  }
+}
 
 // Start Server
 app.listen(PORT, '0.0.0.0', async () => {
