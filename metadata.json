@@ -1,0 +1,6 @@
+{
+  "name": "Node Express Backend",
+  "description": "A complete Node.js backend with Timer and Terminal Command Execution endpoints, Dockerized for Google Cloud Run.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
