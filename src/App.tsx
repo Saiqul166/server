@@ -148,6 +148,11 @@ export default function App() {
                    <Code size={14} /> Check Env Variables
                 </button>
               </li>
+              <li className="flex items-center gap-3">
+                <button onClick={() => executeCommand('npx kill-port 8080 2>/dev/null || fuser -k 8080/tcp 2>/dev/null || killall node || true')} className="flex items-center gap-2 text-slate-300 hover:text-red-400 w-full text-left">
+                   <Square size={14} /> Stop All Running Servers
+                </button>
+              </li>
               <li className="flex items-center gap-3 border-t border-slate-800 pt-3">
                 <button 
                   onClick={() => executeCommand('pip install -U "huggingface_hub[cli]" && huggingface-cli download google/gemma-2-27b-it')} 
