@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Square, Pause, ExternalLink, Terminal, Copy, Check, MessageSquare, Code, Cpu } from 'lucide-react';
+import { Play, Square, Pause, ExternalLink, Terminal, Copy, Check, MessageSquare, Code, Cpu, Download } from 'lucide-react';
 
 export default function App() {
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
@@ -145,6 +145,14 @@ export default function App() {
               <li className="flex items-center gap-3">
                 <button onClick={() => executeCommand('env')} className="flex items-center gap-2 text-slate-300 hover:text-yellow-400 w-full text-left">
                    <Code size={14} /> Check Env Variables
+                </button>
+              </li>
+              <li className="flex items-center gap-3 border-t border-slate-800 pt-3">
+                <button 
+                  onClick={() => executeCommand('pip install -U "huggingface_hub[cli]" && huggingface-cli download google/gemma-2-27b-it')} 
+                  className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300 w-full text-left"
+                >
+                   <Download size={14} /> Download Gemma 31B (Local)
                 </button>
               </li>
             </ul>

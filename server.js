@@ -164,7 +164,7 @@ const startServer = (currentPort) => {
 
     // Cloud Run sets K_SERVICE. If it's undefined, we are running locally (like Cloud Shell)
     if (!process.env.K_SERVICE) {
-      console.log(`\\n=============================================================`);
+      console.log(`\n=============================================================`);
       console.log(`⏳ Starting Cloudflare Tunnel on port ${currentPort}... Please wait.`);
       import('child_process').then(({ spawn }) => {
         // Using Cloudflare Quick Tunnels instead of localtunnel
@@ -173,12 +173,12 @@ const startServer = (currentPort) => {
         let urlFound = false;
         cloudflared.stderr.on('data', (data) => {
           const str = data.toString();
-          const match = str.match(/(https:\\/\\/[a-zA-Z0-9-]+\\.trycloudflare\\.com)/);
+          const match = str.match(/(https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com)/);
           if(match && !urlFound) {
             urlFound = true;
             console.log(`✅ CLOUDFLARE PUBLIC URL: ${match[1]}`);
-            console.log(`=============================================================\\n`);
-            console.log(`আপনি এখন এই Cloudflare লিংকটি ব্যবহার করে যেকোনো ব্রাউজার থেকে অথবা ওয়েবসাইট থেকে API কল করতে পারবেন! এটি 100% কাজ করবে।\\n`);
+            console.log(`=============================================================\n`);
+            console.log(`আপনি এখন এই Cloudflare লিংকটি ব্যবহার করে যেকোনো ব্রাউজার থেকে অথবা ওয়েবসাইট থেকে API কল করতে পারবেন! এটি 100% কাজ করবে।\n`);
           }
         });
         
