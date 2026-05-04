@@ -1,8 +1,25 @@
-import React, { useState } from 'react';
-import { Play, Square, Pause, ExternalLink, Terminal, Copy, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Square, Pause, ExternalLink, Terminal, Copy, Check, MessageSquare, Code, Cpu } from 'lucide-react';
 
 export default function App() {
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
+  const [terminalHistory, setTerminalHistory] = useState<{type: 'user'|'system'|'ai'|'error', text: string}[]>([
+    { type: 'system', text: 'Welcome to CloudNode v1.0 Interactive Terminal' },
+    { type: 'system', text: 'Type a bash command or ask AI to do it for you.' }
+  ]);
+  const [commandInput, setCommandInput] = useState('');
+  const [apiKey, setApiKey] = useState('my-super-secret-key-2024');
+  const [isAiMode, setIsAiMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const endOfMessagesRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [terminalHistory]);
   
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -10,38 +27,71 @@ export default function App() {
     setTimeout(() => setCopiedScript(null), 2000);
   };
 
+  const handleCommandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commandInput.trim()) return;
+
+    const currentCmd = commandInput;
+    setCommandInput('');
+    setTerminalHistory(prev => [...prev, { type: 'user', text: currentCmd }]);
+    setIsLoading(true);
+
+    try {
+      if (isAiMode) {
+        // AI Mode: generate command then execute
+        setTerminalHistory(prev => [...prev, { type: 'ai', text: `🧠 Thinking...` }]);
+        const aiRes = await fetch('/ai-command', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+          body: JSON.stringify({ prompt: currentCmd })
+        });
+        const aiData = await aiRes.json();
+        
+        if (!aiRes.ok) throw new Error(aiData.error || 'Failed to generate AI command');
+        
+        setTerminalHistory(prev => {
+          const newHist = [...prev];
+          newHist[newHist.length - 1] = { type: 'ai', text: `Generated Command: ${aiData.command}` };
+          return newHist;
+        });
+
+        // automatically execute the generated command
+        await executeCommand(aiData.command);
+
+      } else {
+        // Direct Bash Mode
+        await executeCommand(currentCmd);
+      }
+    } catch (err: any) {
+       setTerminalHistory(prev => [...prev, { type: 'error', text: err.message }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const executeCommand = async (cmd: string) => {
+    const runRes = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({ command: cmd })
+    });
+    const runData = await runRes.json();
+
+    if (!runRes.ok) {
+        setTerminalHistory(prev => [...prev, { type: 'error', text: runData.stderr || runData.error }]);
+    } else {
+        if (runData.output) {
+          setTerminalHistory(prev => [...prev, { type: 'system', text: runData.output }]);
+        }
+        if (runData.warnings) {
+          setTerminalHistory(prev => [...prev, { type: 'error', text: runData.warnings }]);
+        }
+    }
+  }
+
   const codeBlocks = {
-    git: `git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/yourusername/reponame.git
-git push -u origin main`,
-    clone: `git clone https://github.com/yourusername/reponame.git
-cd reponame
-npm install
-node server.js`,
-    deploy: `gcloud services enable run.googleapis.com
-gcloud run deploy node-backend \\
-  --source . \\
-  --port 8080 \\
-  --allow-unauthenticated \\
-  --region us-central1`,
-    curl: `curl -X POST https://YOUR-CLOUD-RUN-URL.a.run.app/timer \\
-  -H "Content-Type: application/json" \\
-  -H "x-api-key: my-super-secret-key-2024" \\
-  -d '{"seconds": 5}'`,
-    fetch: `fetch('https://YOUR-CLOUD-RUN-URL.a.run.app/timer', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'x-api-key': 'my-super-secret-key-2024'
-  },
-  body: JSON.stringify({ seconds: 10 })
-})
-.then(res => res.json())
-.then(data => console.log(data))
-.catch(err => console.error(err));`
+    clone: `git pull origin main\nnpm install\nnpm start`,
+    deploy: `gcloud services enable run.googleapis.com\ngcloud run deploy node-backend \\\n  --source . \\\n  --port 8080 \\\n  --allow-unauthenticated \\\n  --region us-central1`
   };
 
   return (
@@ -52,21 +102,26 @@ gcloud run deploy node-backend \\
           <div className="w-3 h-3 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_#22d3ee]"></div>
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-white uppercase flex items-center gap-2">
             <Terminal size={24} className="text-cyan-400" />
-            NodeOps v1.0
+            NodeOps + AI v2.0
           </h1>
           <span className="text-[10px] md:text-xs bg-slate-800 px-2 py-0.5 md:py-1 rounded text-slate-400 border border-slate-700 hidden sm:inline-block">
-            PRODUCTION-READY
+            WITH GEMMA-7B
           </span>
         </div>
         <div className="flex gap-4 items-center">
           <div className="flex items-center gap-2 text-xs md:text-sm">
-            <span className="text-slate-500 italic">Port:</span>
-            <span className="text-cyan-400">process.env.PORT</span>
+            <span className="text-slate-500 italic">API Key:</span>
+            <input 
+              type="password" 
+              value={apiKey} 
+              onChange={e => setApiKey(e.target.value)}
+              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-400 w-32 focus:outline-none focus:border-cyan-500"
+            />
           </div>
           <div className="h-4 w-px bg-slate-800"></div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-green-500"></span>
-            <span className="text-xs md:text-sm text-green-400">Cloud Run Ready</span>
+            <span className="text-xs md:text-sm text-green-400">System Ready</span>
           </div>
         </div>
       </header>
@@ -75,64 +130,66 @@ gcloud run deploy node-backend \\
         {/* Sidebar: Metrics & Endpoints */}
         <section className="col-span-1 md:col-span-4 lg:col-span-3 flex flex-col gap-4">
           <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg shadow-inner">
-            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Architecture</h2>
+            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Quick Actions</h2>
             <ul className="space-y-3 text-sm">
-              <li className="flex items-center gap-3 text-cyan-300">
-                <span className="opacity-50 text-lg">📄</span> server.js
+              <li className="flex items-center gap-3">
+                <button onClick={() => executeCommand('ls -la')} className="flex items-center gap-2 text-slate-300 hover:text-cyan-400 w-full text-left">
+                   <Terminal size={14} /> List Files
+                </button>
               </li>
               <li className="flex items-center gap-3">
-                <span className="opacity-50 text-lg">📦</span> package.json
+                <button onClick={() => executeCommand('npm run dev')} className="flex items-center gap-2 text-slate-300 hover:text-green-400 w-full text-left">
+                   <Play size={14} /> Start Dev Server
+                </button>
               </li>
               <li className="flex items-center gap-3">
-                <span className="opacity-50 text-lg">🐳</span> Dockerfile
+                <button onClick={() => executeCommand('env')} className="flex items-center gap-2 text-slate-300 hover:text-yellow-400 w-full text-left">
+                   <Code size={14} /> Check Env Variables
+                </button>
               </li>
             </ul>
           </div>
-
-          <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
-            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Endpoints</h2>
-            <div className="space-y-4">
-              <div className="group cursor-pointer">
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-blue-400 font-bold">POST</span>
-                  <span className="text-slate-300">/timer</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="w-1/3 h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></div>
-                </div>
-              </div>
-              <div className="group cursor-pointer">
-                <div className="flex justify-between text-xs mb-1.5">
-                  <span className="text-red-400 font-bold">POST</span>
-                  <span className="text-slate-300">/run</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <div className="w-1/2 h-full bg-red-500 shadow-[0_0_8px_#ef4444]"></div>
-                </div>
-              </div>
+          
+          <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg shadow-inner">
+            <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">AI Power (Hugging Face)</h2>
+            <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+               Hugging Face-এর <span className="text-cyan-400">google/gemma-7b-it</span> মডেল ব্যবহার করে শুধু লিখে বললেই টার্মিনাল আপনাকে সার্ভার কন্ট্রোল করতে সাহায্য করবে। 
+            </p>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer p-2 bg-slate-800 rounded border border-slate-700 hover:border-cyan-500 transition-colors">
+                <input 
+                  type="checkbox" 
+                  checked={isAiMode} 
+                  onChange={() => setIsAiMode(!isAiMode)} 
+                  className="accent-cyan-500"
+                />
+                <Cpu size={16} className={isAiMode ? 'text-cyan-400' : 'text-slate-500'} />
+                <span className={isAiMode ? 'text-white' : 'text-slate-400'}>Enable AI Assistant</span>
+              </label>
             </div>
           </div>
           
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-lg flex flex-col gap-2">
-            <div>
-              <h3 className="text-[10px] text-slate-500 uppercase font-bold mb-1">Security Mode</h3>
-              <p className="text-xs text-white">API Key Auth: <span className="text-green-500 font-bold">ACTIVE</span></p>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-1 border-t border-slate-800 pt-2">
-              Header: <span className="text-cyan-400">x-api-key</span>
-            </p>
+          <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-lg">
+             <h2 className="text-xs text-slate-500 mb-3 uppercase tracking-widest font-bold">Info</h2>
+             <p className="text-xs text-slate-400 leading-relaxed mb-4">
+               Cloud Run এ 31B প্যারামিটারের মডেল হোস্ট করা সম্ভব নয় তাই Hugging Face Inference API ব্যবহার করা হয়েছে দ্রুততম রেস্পন্স পাওয়ার জন্য।
+             </p>
+             <p className="text-[10px] text-slate-500 pt-2 border-t border-slate-800">
+               Note: Set HF_TOKEN in server .env for AI features.
+             </p>
           </div>
         </section>
 
-        {/* Main Body: Documentation & Commands */}
+        {/* Main Body: Interactive Terminal */}
         <section className="col-span-1 md:col-span-8 lg:col-span-9 flex flex-col gap-6">
           
-          {/* Instructions Block */}
-          <div className="flex-grow bg-[#050510] rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-2xl relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+          <div className="flex-grow bg-[#050510] rounded-xl border border-slate-800 overflow-hidden flex flex-col shadow-2xl relative min-h-[400px]">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent z-10"></div>
+            
             <div className="bg-slate-900 px-4 py-2.5 flex justify-between items-center border-b border-slate-800">
               <span className="text-xs text-slate-400 font-bold tracking-widest flex items-center gap-2">
-                <Terminal size={14} /> DEPLOYMENT_GUIDE.md
+                <MessageSquare size={14} className={isAiMode ? "text-cyan-400" : "text-slate-500"} /> 
+                {isAiMode ? "AI ASSISTANT TERMINAL" : "BASH TERMINAL"}
               </span>
               <div className="flex gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
@@ -141,78 +198,53 @@ gcloud run deploy node-backend \\
               </div>
             </div>
             
-            <div className="p-5 md:p-6 overflow-y-auto space-y-8 flex-grow">
-              
-              {/* Step 1 & 2 */}
-              <div className="space-y-4">
-                <h3 className="text-lg text-white font-bold border-b border-slate-800 pb-2">1. Local Setup & GitHub Push</h3>
-                <p className="text-slate-400 text-sm">প্রথমে আপনার প্রজেক্ট গিটহাবে পুশ করুন (আপনার লোকাল পিসি থেকে):</p>
-                <div className="relative group">
-                  <pre className="bg-black text-green-400 p-4 rounded-lg text-sm border border-slate-800 overflow-x-auto">
-                    <code>{codeBlocks.git}</code>
-                  </pre>
-                  <button onClick={() => handleCopy(codeBlocks.git, 'git')} className="absolute top-2 right-2 p-1.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                    {copiedScript === 'git' ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
+            <div className="p-4 overflow-y-auto flex-grow flex flex-col gap-2 font-mono text-sm leading-relaxed max-h-[500px]">
+              {terminalHistory.map((msg, i) => (
+                <div key={i} className="mb-1 whitespace-pre-wrap word-break">
+                  {msg.type === 'user' && (
+                    <div className="text-white flex gap-2">
+                      <span className="text-green-400">root@cloudnode:~#</span> 
+                      {msg.text}
+                    </div>
+                  )}
+                  {msg.type === 'system' && (
+                    <div className="text-slate-300 pl-4 border-l-2 border-slate-700">{msg.text}</div>
+                  )}
+                  {msg.type === 'error' && (
+                    <div className="text-red-400 pl-4 border-l-2 border-red-900/50">{msg.text}</div>
+                  )}
+                  {msg.type === 'ai' && (
+                    <div className="text-cyan-400 pl-4 border-l-2 border-cyan-900/50 italic flex items-center gap-2">
+                      <Cpu size={14} /> {msg.text}
+                    </div>
+                  )}
                 </div>
-
-                <p className="text-slate-400 text-sm mt-4">অথবা, গিটহাব থেকে ক্লোন করে সার্ভার রান করতে চাইলে:</p>
-                <div className="relative group">
-                  <pre className="bg-black text-green-400 p-4 rounded-lg text-sm border border-slate-800 overflow-x-auto">
-                    <code>{codeBlocks.clone}</code>
-                  </pre>
-                  <button onClick={() => handleCopy(codeBlocks.clone, 'clone')} className="absolute top-2 right-2 p-1.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                    {copiedScript === 'clone' ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
+              ))}
+              {isLoading && (
+                <div className="text-slate-500 pl-4 flex items-center gap-2 animate-pulse mt-2">
+                  <span className="w-2 h-4 bg-cyan-400 block"></span> Processing...
                 </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="space-y-4">
-                <h3 className="text-lg text-white font-bold border-b border-slate-800 pb-2">2. Google Cloud Run Deploy</h3>
-                <p className="text-slate-400 text-sm">Google Cloud Shell ওপেন করুন এবং প্রজেক্ট ফোল্ডারে গিয়ে কমান্ডগুলো রান করুন:</p>
-                <div className="relative group">
-                  <pre className="bg-black text-cyan-400 p-4 rounded-lg text-sm border border-slate-800 overflow-x-auto">
-                    <code>{codeBlocks.deploy}</code>
-                  </pre>
-                  <button onClick={() => handleCopy(codeBlocks.deploy, 'deploy')} className="absolute top-2 right-2 p-1.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                    {copiedScript === 'deploy' ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
-                </div>
-                <div className="bg-cyan-950/20 border-l-2 border-cyan-400 p-3 rounded">
-                  <p className="text-slate-300 text-sm">✓ Deploying... Done.</p>
-                  <p className="text-white text-sm mt-1">
-                    Service URL: <span className="underline text-cyan-400">https://node-backend-xxx.a.run.app</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Step 4 */}
-              <div className="space-y-4">
-                <h3 className="text-lg text-white font-bold border-b border-slate-800 pb-2">3. API Testing Examples</h3>
-                
-                <p className="text-slate-400 text-sm"><strong className="text-white">Sample Curl Command:</strong> টার্মিনাল থেকে API টেস্ট করতে:</p>
-                <div className="relative group">
-                  <pre className="bg-black text-yellow-400 p-4 rounded-lg text-sm border border-slate-800 overflow-x-auto">
-                    <code>{codeBlocks.curl}</code>
-                  </pre>
-                  <button onClick={() => handleCopy(codeBlocks.curl, 'curl')} className="absolute top-2 right-2 p-1.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                    {copiedScript === 'curl' ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
-                </div>
-
-                <p className="text-slate-400 text-sm mt-4"><strong className="text-white">Website Fetch Example:</strong> ফ্রন্টএন্ড বা ওয়েবসাইট থেকে কল করতে:</p>
-                <div className="relative group">
-                  <pre className="bg-black text-pink-400 p-4 rounded-lg text-sm border border-slate-800 overflow-x-auto">
-                    <code>{codeBlocks.fetch}</code>
-                  </pre>
-                  <button onClick={() => handleCopy(codeBlocks.fetch, 'fetch')} className="absolute top-2 right-2 p-1.5 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
-                    {copiedScript === 'fetch' ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-                  </button>
-                </div>
-              </div>
-              
+              )}
+              <div ref={endOfMessagesRef} />
             </div>
+
+            <form onSubmit={handleCommandSubmit} className="border-t border-slate-800 bg-black p-3 flex">
+              <span className={isAiMode ? "text-cyan-400 mr-2 flex items-center" : "text-green-400 mr-2 flex items-center"}>
+                {isAiMode ? '✨ AI >' : 'root@cloudnode:~#'}
+              </span>
+              <input
+                type="text"
+                value={commandInput}
+                onChange={(e) => setCommandInput(e.target.value)}
+                placeholder={isAiMode ? "Write what you want to do in Bengali or English..." : "Type a bash command (e.g. ls -la)"}
+                className="flex-grow bg-transparent text-white border-none focus:outline-none font-mono text-sm"
+                autoComplete="off"
+                disabled={isLoading}
+              />
+              <button type="submit" disabled={isLoading} className="text-slate-500 hover:text-cyan-400 ml-2">
+                <Play size={16} fill="currentColor" />
+              </button>
+            </form>
           </div>
         </section>
       </main>
@@ -224,9 +256,9 @@ gcloud run deploy node-backend \\
           <span className="flex items-center gap-1"><span className="text-green-500/50">●</span> CLOUD_RUN: optimized</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="italic text-slate-400">Bengali Documentation Integrated</span>
+          <span className="italic text-slate-400">Interactive Web Terminal</span>
           <div className="w-1.5 h-1.5 bg-slate-700 rounded-full border border-slate-600"></div>
-          <span className="text-slate-500">v1.2.0-stable</span>
+          <span className="text-slate-500">v2.0.0-ai-ready</span>
         </div>
       </footer>
     </div>
