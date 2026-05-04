@@ -23,7 +23,16 @@ app.use(express.json());
 const API_KEY = process.env.API_KEY || 'my-super-secret-key-2024';
 
 // Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai = null;
+try {
+  if (process.env.GEMINI_API_KEY) {
+    ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  } else {
+    console.warn("⚠️ WARNING: GEMINI_API_KEY is missing! AI features will not work.");
+  }
+} catch (err) {
+  console.warn("⚠️ Failed to initialize Gemini API:", err.message);
+}
 
 const authenticate = (req, res, next) => {
   const reqApiKey = req.headers['x-api-key'];
@@ -46,6 +55,10 @@ app.post('/ai-command', authenticate, async (req, res) => {
 
   if (!prompt) {
     return res.status(400).json({ error: 'Please provide a prompt.' });
+  }
+
+  if (!ai) {
+    return res.status(500).json({ error: 'Gemini AI API Key is missing. Set GEMINI_API_KEY environment variable.' });
   }
 
   try {
@@ -144,35 +157,50 @@ if (fs.existsSync(distPath)) {
   }
 }
 
-// Start Server
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`Server is successfully running on port ${PORT}`);
+// Start Server with Auto-Port Fallback
+const startServer = (currentPort) => {
+  const server = app.listen(currentPort, '0.0.0.0', async () => {
+    console.log(`Server is successfully running on port ${currentPort}`);
 
-  // Cloud Run sets K_SERVICE. If it's undefined, we are running locally (like Cloud Shell)
-  if (!process.env.K_SERVICE) {
-    console.log(`\n=============================================================`);
-    console.log(`⏳ Starting Cloudflare Tunnel... Please wait.`);
-    import('child_process').then(({ spawn }) => {
-      // Using Cloudflare Quick Tunnels instead of localtunnel
-      const cloudflared = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://localhost:${PORT}`]);
-      
-      let urlFound = false;
-      cloudflared.stderr.on('data', (data) => {
-        const str = data.toString();
-        const match = str.match(/(https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com)/);
-        if(match && !urlFound) {
-          urlFound = true;
-          console.log(`✅ CLOUDFLARE PUBLIC URL: ${match[1]}`);
-          console.log(`=============================================================\n`);
-          console.log(`আপনি এখন এই Cloudflare লিংকটি ব্যবহার করে যেকোনো ব্রাউজার থেকে অথবা ওয়েবসাইট থেকে API কল করতে পারবেন! এটি 100% কাজ করবে।\n`);
-        }
+    // Cloud Run sets K_SERVICE. If it's undefined, we are running locally (like Cloud Shell)
+    if (!process.env.K_SERVICE) {
+      console.log(`\\n=============================================================`);
+      console.log(`⏳ Starting Cloudflare Tunnel on port ${currentPort}... Please wait.`);
+      import('child_process').then(({ spawn }) => {
+        // Using Cloudflare Quick Tunnels instead of localtunnel
+        const cloudflared = spawn('npx', ['--yes', 'cloudflared', 'tunnel', '--url', `http://localhost:${currentPort}`]);
+        
+        let urlFound = false;
+        cloudflared.stderr.on('data', (data) => {
+          const str = data.toString();
+          const match = str.match(/(https:\\/\\/[a-zA-Z0-9-]+\\.trycloudflare\\.com)/);
+          if(match && !urlFound) {
+            urlFound = true;
+            console.log(`✅ CLOUDFLARE PUBLIC URL: ${match[1]}`);
+            console.log(`=============================================================\\n`);
+            console.log(`আপনি এখন এই Cloudflare লিংকটি ব্যবহার করে যেকোনো ব্রাউজার থেকে অথবা ওয়েবসাইট থেকে API কল করতে পারবেন! এটি 100% কাজ করবে।\\n`);
+          }
+        });
+        
+        cloudflared.on('close', (code) => {
+          console.log(`Cloudflare tunnel closed with code ${code}`);
+        });
+      }).catch(err => {
+        console.error('⚠️ Failed to create Cloudflare tunnel:', err.message);
       });
-      
-      cloudflared.on('close', (code) => {
-        console.log(`Cloudflare tunnel closed with code ${code}`);
-      });
-    }).catch(err => {
-      console.error('⚠️ Failed to create Cloudflare tunnel:', err.message);
-    });
-  }
-});
+    }
+  });
+
+  server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+      console.log(`⚠️ Port ${currentPort} is busy. Trying ${currentPort + 1}...`);
+      startServer(currentPort + 1);
+    } else {
+      console.error('Server error:', e);
+    }
+  });
+};
+
+let initialPort = PORT;
+if (typeof initialPort === 'string') initialPort = parseInt(initialPort, 10);
+startServer(initialPort);
