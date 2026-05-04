@@ -4,8 +4,9 @@ import { Play, Square, Pause, ExternalLink, Terminal, Copy, Check, MessageSquare
 export default function App() {
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
   const [terminalHistory, setTerminalHistory] = useState<{type: 'user'|'system'|'ai'|'error', text: string}[]>([
-    { type: 'system', text: 'Welcome to CloudNode v1.0 Interactive Terminal' },
-    { type: 'system', text: 'Type a bash command or ask AI to do it for you.' }
+    { type: 'system', text: 'Welcome to CloudNode Interactive Terminal' },
+    { type: 'system', text: 'Type a bash command or ask AI to do it for you.' },
+    { type: 'system', text: '⚠️ Warning: This is a non-interactive shell. "sudo" commands requiring a password will fail. Use Cloud Shell directly for root access.' }
   ]);
   const [commandInput, setCommandInput] = useState('');
   const [apiKey, setApiKey] = useState('my-super-secret-key-2024');
@@ -211,7 +212,7 @@ export default function App() {
                 <div key={i} className="mb-1 whitespace-pre-wrap word-break">
                   {msg.type === 'user' && (
                     <div className="text-white flex gap-2">
-                      <span className="text-green-400">root@cloudnode:~#</span> 
+                      <span className="text-green-400">user@cloudnode:~$</span> 
                       {msg.text}
                     </div>
                   )}
@@ -238,7 +239,7 @@ export default function App() {
 
             <form onSubmit={handleCommandSubmit} className="border-t border-slate-800 bg-black p-3 flex">
               <span className={isAiMode ? "text-cyan-400 mr-2 flex items-center" : "text-green-400 mr-2 flex items-center"}>
-                {isAiMode ? '✨ AI >' : 'root@cloudnode:~#'}
+                {isAiMode ? '✨ AI >' : 'user@cloudnode:~$'}
               </span>
               <input
                 type="text"
